@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=imserial
+GenericName=Serial Terminal
+Comment=Fast serial terminal with automatic reconnect
+Exec=imserial
+Icon=imserial
+Terminal=false
+Categories=Development;Electronics;Utility;
+Keywords=serial;uart;tty;console;terminal;
+StartupWMClass=imserial
