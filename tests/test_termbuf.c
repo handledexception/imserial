@@ -189,6 +189,15 @@ static void screen_tests(void)
     CHECK(termbuf_line(&tb, tb.scr->top)->time == 9.0);
     termbuf_free(&tb);
 
+    /* the horizontal extent counts cells, not bytes: box drawing is 3 bytes a cell */
+    termbuf_init(&tb, 100);
+    termbuf_resize(&tb, 4, 20);
+    feed(&tb, "\x1b(0qqqqqqqqqq\x1b(B\r\n");
+    CHECK(tb.max_cells == 10);
+    termbuf_add_marker(&tb, TL_INFO, "a connection marker much wider than the twenty column screen", 0);
+    CHECK(tb.max_cells == 10); /* markers don't widen the view */
+    termbuf_free(&tb);
+
     /* REP repeats the last character */
     termbuf_init(&tb, 100);
     feed(&tb, "ab\x1b[3b");

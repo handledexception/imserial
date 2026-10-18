@@ -119,7 +119,7 @@ typedef struct {
     char reply[256];
     int reply_len;
 
-    uint32_t max_len;     /* longest line in bytes, for horizontal extent */
+    uint32_t max_cells;   /* widest line in cells (not bytes), for horizontal extent */
     uint64_t version;     /* bumps on every change */
     uint64_t total_added; /* lines ever created; drives "N new lines" */
 } TermBuf;

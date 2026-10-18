@@ -682,11 +682,18 @@ void ui_termview(App *a, Tab *t, ImVec2 p0, ImVec2 p1)
         /* The view is exactly the console (like PuTTY's window): text is
          * clipped to it and scrollback is only seen by scrolling. A window
          * smaller than the console scrolls instead. */
-        p1.x = minf(p1.x, p0.x + pad_x * 2 + m.gutter + (float)tb->cols * m.char_w + S(12));
-        p1.y = minf(p1.y, p0.y + pad_y * 2 + (float)tb->rows * m.line_h);
+        float want_w = pad_x * 2 + m.gutter + (float)tb->cols * m.char_w + S(12);
+        bool hscroll = want_w > p1.x - p0.x; /* leave room for the horizontal scrollbar */
+        p1.x = minf(p1.x, p0.x + want_w);
+        p1.y = minf(p1.y, p0.y + pad_y * 2 + (float)tb->rows * m.line_h + (hscroll ? S(12) : 0));
     } else {
         float cells_w = (p1.x - p0.x) - pad_x * 2 - m.gutter - S(12);
         float cells_h = (p1.y - p0.y) - pad_y * 2;
+        /* Lines wider than the view (written before the window was narrowed)
+         * bring up a horizontal scrollbar; the rows must fit above it, or the
+         * top row ends up scrolled out of sight. */
+        if ((float)tb->max_cells * m.char_w > cells_w)
+            cells_h -= S(12);
         termbuf_resize(tb, (int)floorf(cells_h / m.line_h), (int)floorf(cells_w / m.char_w));
     }
 
@@ -731,10 +738,12 @@ void ui_termview(App *a, Tab *t, ImVec2 p0, ImVec2 p1)
         nlines = screen_end - first;
     if (alt)
         t->follow = true;
-    /* Content width: the longest line, or exactly the console when its size is
-     * fixed (older, wider lines are clipped rather than widening the view). */
-    float content_w = a->console_fixed ? pad_x * 2 + m.gutter + (float)tb->cols * m.char_w
-                                       : pad_x * 2 + m.gutter + (float)(tb->max_len + 2) * m.char_w;
+    /* Content width: the widest line in cells (never bytes: box-drawing
+     * characters are 3 bytes each), or exactly the console when its size is
+     * fixed (older, wider lines are clipped rather than widening the view).
+     * No slack beyond that: a full-width line must not bring up a scrollbar. */
+    float content_w = pad_x * 2 + m.gutter +
+                      (float)(a->console_fixed ? (uint32_t)tb->cols : tb->max_cells) * m.char_w;
     igSetCursorScreenPos(p0);
     igSetNextWindowContentSize(v2(content_w, 0));
     igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, v2(0, pad_y));
@@ -750,7 +759,8 @@ void ui_termview(App *a, Tab *t, ImVec2 p0, ImVec2 p1)
     bool hovered = igIsWindowHovered(0);
     ImDrawList *dl = igGetWindowDrawList();
     ImVec2 wpos = igGetWindowPos(), wsize = igGetWindowSize();
-    float view_h = wsize.y - pad_y * 2;
+    /* Visible text height: without the horizontal scrollbar when it shows. */
+    float view_h = wsize.y - pad_y * 2 - (igGetCurrentWindow()->ScrollbarX ? igGetStyle()->ScrollbarSize : 0);
 
     /* Lines are positioned relative to the oldest retained line, so when the
      * ring evicts lines while the user is scrolled up, shift the scroll to
@@ -832,7 +842,7 @@ void ui_termview(App *a, Tab *t, ImVec2 p0, ImVec2 p1)
      * padding, and rows entirely above it aren't drawn at all: otherwise the
      * row above the first visible one shows in the top padding, and its
      * descenders can hang into the first row. */
-    float inner_top = wpos.y + pad_y, inner_bot = wpos.y + wsize.y - pad_y;
+    float inner_top = wpos.y + pad_y, inner_bot = inner_top + view_h;
     ImDrawList_PushClipRect(dl, v2(wpos.x, inner_top), v2(wpos.x + wsize.x, inner_bot), true);
     ImGuiListClipper *clip = ImGuiListClipper_ImGuiListClipper();
     ImGuiListClipper_Begin(clip, (int)nlines, m.line_h);

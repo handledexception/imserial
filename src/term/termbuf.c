@@ -151,8 +151,8 @@ static void line_splice(TermBuf *tb, TermLine *l, uint32_t a, uint32_t b, const 
         l->time = tb->now;
     l->len = newlen;
     l->cells = l->cells - old_cells + count_cells(src ? src : "", n);
-    if (l->len > tb->max_len)
-        tb->max_len = l->len;
+    if (l->cells > tb->max_cells)
+        tb->max_cells = l->cells;
     tb->version++;
 }
 
@@ -1095,7 +1095,7 @@ void termbuf_clear(TermBuf *tb)
         s->row = s->col = 0;
         s->wrap_pending = false;
     }
-    tb->max_len = 0;
+    tb->max_cells = 0;
     tb->version++;
 }
 
@@ -1209,8 +1209,7 @@ void termbuf_add_marker(TermBuf *tb, TermLineKind kind, const char *text, double
     memcpy(l->text, text, n);
     l->len = n;
     l->cells = count_cells(text, n);
-    if (l->len > tb->max_len)
-        tb->max_len = l->len;
+    /* (markers don't count toward max_cells: they're drawn to fit the view) */
 
     /* The cursor continues on a fresh line below the marker. */
     cabs = s->first_abs + s->count;
