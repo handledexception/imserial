@@ -51,6 +51,7 @@ if(NOT Freetype_FOUND)
   set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
   set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
   set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+  set(SKIP_INSTALL_ALL ON) # keep FreeType's headers/libs out of our packages
   FetchContent_Declare(freetype
     URL https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
@@ -158,9 +159,55 @@ add_executable(test_session tests/test_session.c src/serial/session.c src/serial
 target_include_directories(test_session PRIVATE src)
 target_link_libraries(test_session PRIVATE serialport SDL3::SDL3)
 
-install(TARGETS imserial RUNTIME DESTINATION bin)
+# --- Install + packaging (cpack) ---------------------------------------------
+# Windows ships as a flat zip (imserial.exe at the top level); Linux installs
+# under the usual bin/ and share/ layout, which CPack roots at /usr for the
+# .deb and .rpm.
+if(WIN32)
+  set(IMSERIAL_BINDIR .)
+else()
+  set(IMSERIAL_BINDIR bin)
+endif()
+install(TARGETS imserial RUNTIME DESTINATION ${IMSERIAL_BINDIR})
 if(UNIX AND NOT APPLE)
   install(FILES packaging/imserial.desktop DESTINATION share/applications)
   install(FILES assets/icon/imserial.svg DESTINATION share/icons/hicolor/scalable/apps)
   install(FILES assets/icon/imserial-256.png DESTINATION share/icons/hicolor/256x256/apps RENAME imserial.png)
 endif()
+
+set(CPACK_PACKAGE_NAME imserial)
+set(CPACK_PACKAGE_VENDOR "Paul Hindt")
+set(CPACK_PACKAGE_CONTACT "Paul Hindt <phindt@gmail.com>")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/handledexception/imserial")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Fast serial terminal with automatic reconnect")
+set(CPACK_PACKAGE_DESCRIPTION
+  "A fast, minimal serial terminal with a VS Code-style UI. Each tab follows
+its device by USB identity and reconnects automatically when it comes back.")
+set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_STRIP_FILES ON)
+set(CPACK_SOURCE_GENERATOR "")
+if(WIN32)
+  set(CPACK_GENERATOR ZIP)
+elseif(UNIX AND NOT APPLE)
+  set(CPACK_GENERATOR "TGZ;DEB;RPM")
+  # .deb: let dpkg-shlibdeps compute Depends from the linked libraries.
+  set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+  set(CPACK_DEBIAN_PACKAGE_SECTION electronics)
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+  # .rpm: rpmbuild computes Requires itself. Don't claim ownership of
+  # directories that belong to the filesystem / hicolor-icon-theme packages
+  # (this list replaces CPack's default, so the base directories are repeated).
+  set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+  set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
+  set(CPACK_RPM_PACKAGE_LICENSE "Unspecified")
+  set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+    /usr /usr/bin /usr/share
+    /usr/share/applications
+    /usr/share/icons
+    /usr/share/icons/hicolor
+    /usr/share/icons/hicolor/scalable
+    /usr/share/icons/hicolor/scalable/apps
+    /usr/share/icons/hicolor/256x256
+    /usr/share/icons/hicolor/256x256/apps)
+endif()
+include(CPack)

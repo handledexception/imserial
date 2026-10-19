@@ -57,7 +57,15 @@ On Debian/Ubuntu, SDL3 needs the usual X11/Wayland development headers. See
 the [SDL Linux build dependencies](https://wiki.libsdl.org/SDL3/README-linux#build-dependencies).
 To open serial ports, your user must be in the `dialout` group.
 
-### Windows (untested so far)
+### Packages
+
+`cpack --config build/CPackConfig.cmake` builds a `.tar.gz`, `.deb` and `.rpm`
+on Linux (needs `dpkg-dev` and `rpm`) and a `.zip` on Windows. The GitHub
+Actions workflow in `.github/workflows/build.yml` does this for every push
+and pull request and uploads the results as artifacts; pushing a `v*` tag
+attaches them to a GitHub release.
+
+### Windows
 
 The same CMake project should build with MSVC or MinGW. SDL3 and libserialport
 (SetupAPI enumeration plus overlapped I/O) handle the platform details, and
