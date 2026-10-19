@@ -2,7 +2,9 @@
  * console size and session logging. Changes apply immediately and are saved
  * with the rest of the settings. Also the "log file exists" prompt. */
 #include "ui/ui.h"
+#include "app/fontlist.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -163,25 +165,82 @@ void ui_preferences(App *a)
         app_set_ui_font_size(a, ui_fs);
 
     section("TERMINAL");
+    /* The font combo lists the built-in fonts (in MONO_BUILTIN_* order), then
+     * the machine's monospace fonts once the background scan is in, then
+     * "Custom file", which shows the path field below. */
+    static const char *const k_builtin[] = {"IBM Plex Mono (built-in)", "JetBrains Mono (built-in)"};
+    static const char *fallback[MONO_BUILTIN_COUNT + 1];
+    static const char **grown;
+    static int grown_cap;
+    static bool custom_pending; /* "Custom file" chosen but no path picked yet */
+    fontlist_start(a->wake_event);
+    int nf = fontlist_count();
+    int nitems = MONO_BUILTIN_COUNT + nf + 1, custom = nitems - 1;
+    if (nitems > grown_cap) {
+        const char **p = realloc(grown, (size_t)nitems * sizeof *p);
+        if (p) {
+            grown = p;
+            grown_cap = nitems;
+        }
+    }
+    const char **items = grown;
+    if (nitems > grown_cap) { /* out of memory: just the built-ins */
+        nf = 0;
+        nitems = MONO_BUILTIN_COUNT + 1;
+        custom = nitems - 1;
+        items = fallback;
+    }
+    for (int i = 0; i < MONO_BUILTIN_COUNT; i++)
+        items[i] = k_builtin[i];
+    const char *const *labels = fontlist_labels();
+    for (int i = 0; i < nf; i++)
+        items[MONO_BUILTIN_COUNT + i] = labels[i];
+    items[custom] = "Custom file\xE2\x80\xA6";
+
+    int fi;
+    if (a->mono_font_path[0]) {
+        int found = nf ? fontlist_find(a->mono_font_path) : -1;
+        fi = found >= 0 ? MONO_BUILTIN_COUNT + found : custom;
+    } else {
+        fi = custom_pending ? custom : a->mono_builtin;
+    }
     ui_form_label("Font", lw);
-    {
+    igSetNextWindowSizeConstraints(v2(0, 0), v2(FLT_MAX, S(320)), NULL, NULL);
+    if (ui_combo("##font", &fi, items, nitems)) {
+        custom_pending = false;
+        if (fi < MONO_BUILTIN_COUNT) {
+            app_set_mono_builtin(a, fi);
+        } else if (fi < custom) {
+            app_set_mono_font(a, fontlist_face(fi - MONO_BUILTIN_COUNT)->path);
+        } else {
+            custom_pending = true;
+            browse_font(a);
+        }
+    }
+    if (fontlist_scanning()) {
+        igSetCursorPosX(igGetCursorPosX() + lw);
+        igPushStyleColor_U32(ImGuiCol_Text, th->fg_dim);
+        igTextUnformatted("Looking for installed fonts\xE2\x80\xA6", NULL);
+        igPopStyleColor(1);
+    } else if (fi != custom) {
+        igSetCursorPosX(igGetCursorPosX() + lw);
+        if (igTextLink("Rescan installed fonts"))
+            fontlist_rescan(a->wake_event);
+    }
+    if (fi == custom) {
         static char buf[1024];
         ImGuiID fid = igGetID_Str("##fontpath");
         if (igGetActiveID() != fid)
             snprintf(buf, sizeof buf, "%s", a->mono_font_path);
         float bw = S(80), gap = S(6);
+        igSetCursorPosX(igGetCursorPosX() + lw);
         igSetNextItemWidth(igGetContentRegionAvail().x - bw - gap);
-        igInputTextWithHint("##fontpath", "Built-in (JetBrains Mono)", buf, sizeof buf, 0, NULL, NULL);
+        igInputTextWithHint("##fontpath", "Path to a TTF/OTF file", buf, sizeof buf, 0, NULL, NULL);
         if (igIsItemDeactivatedAfterEdit())
             app_set_mono_font(a, buf);
         igSameLine(0, gap);
         if (ui_button("Browse\xE2\x80\xA6", NULL, v2(bw, igGetFrameHeight()), false))
             browse_font(a);
-    }
-    if (a->mono_font_path[0]) {
-        igSetCursorPosX(igGetCursorPosX() + lw);
-        if (igTextLink("Use built-in font"))
-            app_set_mono_font(a, NULL);
     }
     if (a->font_error[0]) {
         igSetCursorPosX(igGetCursorPosX() + lw);

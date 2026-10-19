@@ -11,10 +11,14 @@
 #define INPUT_MAX 2048
 
 /* Preferences: defaults and allowed ranges. */
-#define UI_FONT_DEFAULT 13.0f
+#define UI_FONT_DEFAULT 15.0f
 #define UI_FONT_MIN 10.0f
 #define UI_FONT_MAX 20.0f
-#define MONO_FONT_DEFAULT 14.0f
+#define MONO_FONT_DEFAULT 15.0f
+
+/* Built-in terminal fonts (Preferences > Terminal > Font). */
+enum { MONO_BUILTIN_PLEX, MONO_BUILTIN_JETBRAINS, MONO_BUILTIN_COUNT };
+#define MONO_BUILTIN_DEFAULT MONO_BUILTIN_PLEX
 #define MONO_FONT_MIN 8.0f
 #define MONO_FONT_MAX 32.0f
 #define ZOOM_MIN 0.5f
@@ -101,10 +105,11 @@ typedef struct App {
 
     ImFont *font_ui;      /* Inter + codicons */
     ImFont *font_ui_bold; /* Inter SemiBold + codicons */
-    ImFont *font_mono;    /* terminal font (JetBrains Mono or the user's) + codicons */
+    ImFont *font_mono;    /* terminal font (built-in or the user's) + codicons */
     ImFont *font_mono_bold;
     float font_size;       /* UI text px (unscaled) */
     float mono_size;       /* terminal text px (unscaled) */
+    int mono_builtin;          /* MONO_BUILTIN_* used when mono_font_path is empty */
     char mono_font_path[1024]; /* user's terminal font file; empty = built-in */
     bool fonts_dirty;          /* reload the terminal font before the next frame */
     char font_error[256];      /* why the user's font couldn't be used */
@@ -181,6 +186,7 @@ void app_set_ui_font_size(App *a, float px);
 void app_set_mono_size(App *a, float px);
 void app_set_zoom(App *a, float zoom);
 void app_set_mono_font(App *a, const char *path);
+void app_set_mono_builtin(App *a, int which);
 void app_set_console_size(App *a, bool fixed, int cols, int rows);
 void app_set_scrollback(App *a, int lines);
 /* Call after changing a->logcfg: open logs are closed and reopen with the new settings. */

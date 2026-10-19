@@ -102,8 +102,9 @@ already busy with another port, the double-click opens it in a new tab
 instead. Changes to baud rate, framing, flow control and DTR/RTS take effect
 immediately on a live connection.
 
-**File > Preferences** sets the theme, zoom, UI font size, terminal font (any
-TTF/OTF file, or the built-in JetBrains Mono) and terminal font size. Its
+**File > Preferences** sets the theme, zoom, UI font size, terminal font (the
+built-in IBM Plex Mono or JetBrains Mono, any monospace font installed on the
+machine, or any TTF/OTF file) and terminal font size. Its
 Console section chooses whether the console fits the window or has a fixed
 size in columns × rows (like PuTTY's window size, handy for matching the
 device's tty), and how many lines of scrollback to keep.
@@ -171,17 +172,21 @@ ctest --test-dir build --output-on-failure
 
 ## Licenses
 
-imserial's own license hasn't been chosen yet. It bundles the following:
+imserial is released under the [MIT License](LICENSE). It bundles the
+following:
 
 - [Dear ImGui](https://github.com/ocornut/imgui) and [cimgui](https://github.com/cimgui/cimgui) (MIT)
 - [SDL3](https://libsdl.org) (zlib)
 - [libserialport](https://sigrok.org/wiki/Libserialport) (**LGPL-3.0-or-later**).
-  It's linked statically, so if you distribute binaries you must also make it
-  possible to relink against a modified libserialport (for example by shipping
-  object files or source), or switch to linking it dynamically.
+  It's linked statically. The LGPL requires that users can relink the app
+  against a modified libserialport; imserial's full source is published and
+  the build fetches libserialport from source, so that's satisfied. If you
+  ship a closed-source fork, you must provide object files or source so that
+  relinking stays possible, or link libserialport dynamically.
 - [FreeType](https://freetype.org) (FTL)
 - [cJSON](https://github.com/DaveGamble/cJSON) (MIT)
-- [Inter](https://rsms.me/inter/) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (SIL OFL 1.1)
+- [Inter](https://rsms.me/inter/), [IBM Plex Mono](https://github.com/IBM/plex) and
+  [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (SIL OFL 1.1)
 - [Codicons](https://github.com/microsoft/vscode-codicons) (CC BY 4.0)
 
 The license files for the fonts are in `assets/fonts/`.

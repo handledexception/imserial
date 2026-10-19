@@ -93,7 +93,8 @@ endif()
 
 # --- Embedded assets ---------------------------------------------------------
 set(ASSET_FILES
-  Inter-Regular.ttf Inter-SemiBold.ttf JetBrainsMono-Regular.ttf JetBrainsMono-Bold.ttf codicon.ttf)
+  Inter-Regular.ttf Inter-SemiBold.ttf IBMPlexMono-Regular.ttf IBMPlexMono-Bold.ttf
+  JetBrainsMono-Regular.ttf JetBrainsMono-Bold.ttf codicon.ttf)
 set(ASSET_SOURCES)
 foreach(f ${ASSET_FILES})
   string(MAKE_C_IDENTIFIER "asset_${f}" sym)
@@ -110,6 +111,7 @@ set(APP_SOURCES
   src/main.c
   src/app/app.c
   src/app/settings.c
+  src/app/fontlist.c
   src/app/log.c
   src/ui/layout.c
   src/serial/serial_sp.c
@@ -151,6 +153,10 @@ add_executable(test_log tests/test_log.c src/app/log.c)
 target_include_directories(test_log PRIVATE src)
 target_link_libraries(test_log PRIVATE SDL3::SDL3)
 add_test(NAME log COMMAND test_log)
+add_executable(test_fontlist tests/test_fontlist.c src/app/fontlist.c)
+target_include_directories(test_fontlist PRIVATE src)
+target_link_libraries(test_fontlist PRIVATE SDL3::SDL3 Freetype::Freetype)
+add_test(NAME fontlist COMMAND test_fontlist)
 add_executable(test_reconnect tests/test_reconnect.c tests/fake_serial.c src/serial/session.c)
 target_include_directories(test_reconnect PRIVATE src tests)
 target_link_libraries(test_reconnect PRIVATE SDL3::SDL3)
@@ -184,6 +190,7 @@ set(CPACK_PACKAGE_DESCRIPTION
   "A fast, minimal serial terminal with a VS Code-style UI. Each tab follows
 its device by USB identity and reconnects automatically when it comes back.")
 set(CPACK_PACKAGE_FILE_NAME "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_SOURCE_DIR}/LICENSE)
 set(CPACK_STRIP_FILES ON)
 set(CPACK_SOURCE_GENERATOR "")
 if(WIN32)
@@ -199,7 +206,7 @@ elseif(UNIX AND NOT APPLE)
   # (this list replaces CPack's default, so the base directories are repeated).
   set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
   set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-  set(CPACK_RPM_PACKAGE_LICENSE "Unspecified")
+  set(CPACK_RPM_PACKAGE_LICENSE "MIT")
   set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /usr /usr/bin /usr/share
     /usr/share/applications

@@ -19,11 +19,15 @@
 #include <SDL3/SDL_main.h> /* WinMain shim for the Windows GUI subsystem */
 #include <SDL3/SDL_opengl.h>
 
+#include "app/fontlist.h"
+
 #define ASSET(name)                                                                                                  \
     extern const unsigned char asset_##name[];                                                                       \
     extern const unsigned int asset_##name##_size;
 ASSET(Inter_Regular_ttf)
 ASSET(Inter_SemiBold_ttf)
+ASSET(IBMPlexMono_Regular_ttf)
+ASSET(IBMPlexMono_Bold_ttf)
 ASSET(JetBrainsMono_Regular_ttf)
 ASSET(JetBrainsMono_Bold_ttf)
 ASSET(codicon_ttf)
@@ -144,7 +148,8 @@ static ImFont *add_font(ImGuiIO *io, const unsigned char *data, unsigned size, c
 }
 
 /* Terminal fonts: the user's font file when set (FreeType synthesizes the
- * bold face), falling back to the embedded JetBrains Mono. */
+ * bold face), falling back to the chosen built-in font (IBM Plex Mono by
+ * default, or JetBrains Mono). */
 static void load_mono_fonts(App *a)
 {
     ImGuiIO *io = igGetIO_Nil();
@@ -163,10 +168,16 @@ static void load_mono_fonts(App *a)
             ImFontAtlas_RemoveFont(io->Fonts, r);
         snprintf(a->font_error, sizeof a->font_error, "Couldn't load this font file. Using the built-in font.");
     }
-    a->font_mono = add_font(io, asset_JetBrainsMono_Regular_ttf, asset_JetBrainsMono_Regular_ttf_size, NULL,
-                            a->mono_size, fl, true);
-    a->font_mono_bold = add_font(io, asset_JetBrainsMono_Bold_ttf, asset_JetBrainsMono_Bold_ttf_size, NULL,
-                                 a->mono_size, fl, false);
+    const unsigned char *reg = asset_IBMPlexMono_Regular_ttf, *bold = asset_IBMPlexMono_Bold_ttf;
+    unsigned reg_size = asset_IBMPlexMono_Regular_ttf_size, bold_size = asset_IBMPlexMono_Bold_ttf_size;
+    if (a->mono_builtin == MONO_BUILTIN_JETBRAINS) {
+        reg = asset_JetBrainsMono_Regular_ttf;
+        reg_size = asset_JetBrainsMono_Regular_ttf_size;
+        bold = asset_JetBrainsMono_Bold_ttf;
+        bold_size = asset_JetBrainsMono_Bold_ttf_size;
+    }
+    a->font_mono = add_font(io, reg, reg_size, NULL, a->mono_size, fl, true);
+    a->font_mono_bold = add_font(io, bold, bold_size, NULL, a->mono_size, fl, false);
 }
 
 static void load_fonts(App *a)
@@ -228,6 +239,15 @@ void app_set_mono_font(App *a, const char *path)
     snprintf(a->mono_font_path, sizeof a->mono_font_path, "%s", path ? path : "");
     a->fonts_dirty = true;
     app_mark_dirty(a);
+}
+
+/* Picks a built-in terminal font; also drops any user font file. */
+void app_set_mono_builtin(App *a, int which)
+{
+    if (which < 0 || which >= MONO_BUILTIN_COUNT)
+        which = MONO_BUILTIN_DEFAULT;
+    a->mono_builtin = which;
+    app_set_mono_font(a, NULL);
 }
 
 void app_set_theme(App *a, bool dark)
@@ -416,6 +436,7 @@ int main(int argc, char **argv)
 #endif
     a->font_size = UI_FONT_DEFAULT;
     a->mono_size = MONO_FONT_DEFAULT;
+    a->mono_builtin = MONO_BUILTIN_DEFAULT;
     a->zoom = 1.0f;
     a->console_cols = CONSOLE_COLS_DEFAULT;
     a->console_rows = CONSOLE_ROWS_DEFAULT;
@@ -580,6 +601,7 @@ int main(int argc, char **argv)
     igDestroyContext(NULL);
     SDL_GL_DestroyContext(a->gl);
     SDL_DestroyWindow(a->window);
+    fontlist_shutdown();
     SDL_Quit();
     return 0;
 }

@@ -223,7 +223,7 @@ static void about_popup(App *a)
         igTextUnformatted("A fast, minimal serial terminal.", NULL);
         igSpacing();
         igTextUnformatted("Built with Dear ImGui (cimgui), SDL3, libserialport,", NULL);
-        igTextUnformatted("FreeType, cJSON, Inter, JetBrains Mono and Codicons.", NULL);
+        igTextUnformatted("FreeType, cJSON, Inter, IBM Plex Mono, JetBrains Mono and Codicons.", NULL);
         igPopStyleColor(1);
         igSpacing();
         if (ui_button("Close", NULL, v2(S(90), S(28)), true) || igIsKeyPressed_Bool(ImGuiKey_Escape, false))

@@ -80,6 +80,11 @@ void settings_load(App *a)
     a->mono_size = clampf((float)num(root, "terminalFontSize", a->mono_size), MONO_FONT_MIN, MONO_FONT_MAX);
     a->zoom = clampf((float)num(root, "zoom", a->zoom), ZOOM_MIN, ZOOM_MAX);
     str(root, "terminalFont", a->mono_font_path, sizeof a->mono_font_path);
+    {
+        char builtin[32] = "";
+        str(root, "terminalBuiltinFont", builtin, sizeof builtin);
+        a->mono_builtin = !strcmp(builtin, "jetbrains-mono") ? MONO_BUILTIN_JETBRAINS : MONO_BUILTIN_PLEX;
+    }
     char size_mode[16] = "";
     str(root, "consoleSize", size_mode, sizeof size_mode);
     a->console_fixed = strcmp(size_mode, "fixed") == 0;
@@ -162,6 +167,8 @@ void settings_save(App *a)
     cJSON_AddNumberToObject(root, "terminalFontSize", a->mono_size);
     cJSON_AddNumberToObject(root, "zoom", a->zoom);
     cJSON_AddStringToObject(root, "terminalFont", a->mono_font_path);
+    cJSON_AddStringToObject(root, "terminalBuiltinFont",
+                            a->mono_builtin == MONO_BUILTIN_JETBRAINS ? "jetbrains-mono" : "plex-mono");
     cJSON_AddStringToObject(root, "consoleSize", a->console_fixed ? "fixed" : "fit");
     cJSON_AddNumberToObject(root, "consoleColumns", a->console_cols);
     cJSON_AddNumberToObject(root, "consoleRows", a->console_rows);
