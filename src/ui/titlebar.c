@@ -3,6 +3,7 @@
  * areas drag the window (see hit_test() in main.c). */
 #include "ui/ui.h"
 
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -114,6 +115,10 @@ static void menu_contents(App *a, int m)
             t->nl_mode = t->nl_mode == TB_NL_ANY ? TB_NL_TERMINAL : TB_NL_ANY;
             app_tab_apply_config(a, t);
         }
+        if (igMenuItem_Bool("Batch Screen Redraws", NULL, t && t->batch_redraws, t != NULL)) {
+            t->batch_redraws = !t->batch_redraws;
+            app_mark_dirty(a);
+        }
         break;
     case MENU_HELP:
         if (igMenuItem_Bool("About imserial", NULL, false, true))
@@ -216,15 +221,29 @@ static void about_popup(App *a)
                        v2(0.5f, 0.5f));
     igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, v2(S(20), S(16)));
     if (igBeginPopupModal("About imserial", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {
+        /* Large app icon on the left, name and tagline centred beside it. */
+        float isz = S(64);
+        ImVec2 ip = igGetCursorScreenPos();
+        ui_draw_app_logo(igGetWindowDrawList(), v2(ip.x + isz * 0.5f, ip.y + isz * 0.5f), isz);
+        igDummy(v2(isz, isz));
+        igSameLine(0, S(16));
+        igBeginGroup();
+        float text_h = 16 + igGetStyle()->ItemSpacing.y + igGetTextLineHeight();
+        if (text_h < isz)
+            igSetCursorPosY(igGetCursorPosY() + (isz - text_h) * 0.5f);
         igPushFont(a->font_ui_bold, 16);
         igTextUnformatted("imserial " IMSERIAL_VERSION, NULL);
         igPopFont();
         igPushStyleColor_U32(ImGuiCol_Text, a->theme.fg_dim);
         igTextUnformatted("A fast, minimal serial terminal.", NULL);
+        igEndGroup();
         igSpacing();
         igTextUnformatted("Built with Dear ImGui (cimgui), SDL3, libserialport,", NULL);
         igTextUnformatted("FreeType, cJSON, Inter, IBM Plex Mono, JetBrains Mono and Codicons.", NULL);
         igPopStyleColor(1);
+        igSpacing();
+        if (igTextLink(IMSERIAL_URL))
+            SDL_OpenURL(IMSERIAL_URL);
         igSpacing();
         if (ui_button("Close", NULL, v2(S(90), S(28)), true) || igIsKeyPressed_Bool(ImGuiKey_Escape, false))
             igCloseCurrentPopup();

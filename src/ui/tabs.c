@@ -24,6 +24,10 @@ static void more_menu(App *a, Tab *t)
             t->nl_mode = t->nl_mode == TB_NL_ANY ? TB_NL_TERMINAL : TB_NL_ANY;
             app_tab_apply_config(a, t);
         }
+        if (igMenuItem_Bool("Batch Screen Redraws", NULL, t->batch_redraws, true)) {
+            t->batch_redraws = !t->batch_redraws;
+            app_mark_dirty(a);
+        }
         if (igMenuItem_Bool("Auto-Reconnect", NULL, t->auto_reconnect, true)) {
             t->auto_reconnect = !t->auto_reconnect;
             app_tab_apply_config(a, t);

@@ -677,13 +677,14 @@ void ui_termview(App *a, Tab *t, ImVec2 p0, ImVec2 p1)
     /* The terminal's size in cells: fixed (Preferences > Console), or
      * whatever fits in the view. */
     ImVec2 avail1 = p1;
+    bool hscroll = false; /* a horizontal scrollbar will take a row's worth of height */
     if (a->console_fixed) {
         termbuf_resize(tb, a->console_rows, a->console_cols);
         /* The view is exactly the console (like PuTTY's window): text is
          * clipped to it and scrollback is only seen by scrolling. A window
          * smaller than the console scrolls instead. */
         float want_w = pad_x * 2 + m.gutter + (float)tb->cols * m.char_w + S(12);
-        bool hscroll = want_w > p1.x - p0.x; /* leave room for the horizontal scrollbar */
+        hscroll = want_w > p1.x - p0.x; /* leave room for the horizontal scrollbar */
         p1.x = minf(p1.x, p0.x + want_w);
         p1.y = minf(p1.y, p0.y + pad_y * 2 + (float)tb->rows * m.line_h + (hscroll ? S(12) : 0));
     } else {
@@ -692,7 +693,8 @@ void ui_termview(App *a, Tab *t, ImVec2 p0, ImVec2 p1)
         /* Lines wider than the view (written before the window was narrowed)
          * bring up a horizontal scrollbar; the rows must fit above it, or the
          * top row ends up scrolled out of sight. */
-        if ((float)tb->max_cells * m.char_w > cells_w)
+        hscroll = (float)tb->max_cells * m.char_w > cells_w;
+        if (hscroll)
             cells_h -= S(12);
         termbuf_resize(tb, (int)floorf(cells_h / m.line_h), (int)floorf(cells_w / m.char_w));
     }
@@ -744,8 +746,22 @@ void ui_termview(App *a, Tab *t, ImVec2 p0, ImVec2 p1)
      * No slack beyond that: a full-width line must not bring up a scrollbar. */
     float content_w = pad_x * 2 + m.gutter +
                       (float)(a->console_fixed ? (uint32_t)tb->cols : tb->max_cells) * m.char_w;
+    /* Declare the content height, and in follow mode the scroll target, up
+     * front. A scroll set at the end of the frame only takes effect on the
+     * next one, so a page that arrived in one go (a clear screen pushes the
+     * old page into scrollback and starts a new one below it) would be drawn
+     * for a frame under the old page, which still sat at the top. The height
+     * mirrors the rows laid out below: the lines plus the leftover under the
+     * last row. A wheel-up this frame is a request to leave the bottom. */
+    float view_h0 = (p1.y - p0.y) - pad_y * 2 - (hscroll ? S(12) : 0);
+    float rem0 = view_h0 - (float)tb->rows * m.line_h;
+    float content_h = (float)nlines * m.line_h + (rem0 > 0 ? rem0 : 0);
+    ImVec2 mp0 = io->MousePos;
+    bool wheel_up = io->MouseWheel > 0 && mp0.x >= p0.x && mp0.x < p1.x && mp0.y >= p0.y && mp0.y < p1.y;
     igSetCursorScreenPos(p0);
-    igSetNextWindowContentSize(v2(content_w, 0));
+    igSetNextWindowContentSize(v2(content_w, content_h));
+    if (t->follow && t->scroll_to_line < 0 && !wheel_up)
+        igSetNextWindowScroll(v2(-1, content_h));
     igPushStyleVar_Vec2(ImGuiStyleVar_WindowPadding, v2(0, pad_y));
     igPushStyleVar_Vec2(ImGuiStyleVar_ItemSpacing, v2(0, 0));
     igPushStyleVar_Float(ImGuiStyleVar_ScrollbarSize, S(12));

@@ -76,6 +76,14 @@ uint64_t session_tx_bytes(Session *s);
 /* Swaps out pending records into *out (which is reset first). Returns true
  * if anything was pending. Call from the UI thread. */
 bool session_drain(Session *s, SessionBuf *out);
+/* SDL_GetTicksNS() when the last byte was received (0 if none yet). */
+uint64_t session_last_rx_ns(Session *s);
+/* Screen-redraw hints in the records not yet drained: BEGIN when a clear
+ * screen, cursor home, alternate screen or synchronized-output start has
+ * arrived, END when a synchronized-output end has. Each byte is looked at
+ * once; the flags accumulate until the next drain. Call from the UI thread. */
+enum { SESSION_SYNC_BEGIN = 1, SESSION_SYNC_END = 2 };
+int session_peek_sync(Session *s);
 void session_buf_free(SessionBuf *b);
 
 /* Iteration helper: returns the next record or NULL; *payload points into buf. */

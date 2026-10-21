@@ -9,6 +9,7 @@
 #define MAX_PORTS 64
 #define HISTORY_MAX 100
 #define INPUT_MAX 2048
+#define IMSERIAL_URL "https://github.com/handledexception/imserial"
 
 /* Preferences: defaults and allowed ranges. */
 #define UI_FONT_DEFAULT 15.0f
@@ -47,6 +48,8 @@ typedef struct Tab {
     bool auto_reconnect;
     bool timestamps;
     bool local_echo;
+    bool batch_redraws;     /* hold a screen redraw until it has fully arrived */
+    uint64_t hold_since_ns; /* when the current hold began; 0 = not holding */
     TermNewlineMode nl_mode;
     TxEol tx_eol;
     bool want_connected; /* user intent, persisted across restarts */
@@ -114,6 +117,7 @@ typedef struct App {
     bool fonts_dirty;          /* reload the terminal font before the next frame */
     char font_error[256];      /* why the user's font couldn't be used */
     bool prefs_open;           /* request to open Preferences on the next frame */
+    bool rx_holding;           /* a tab is holding a redraw: poll the sessions soon */
 
     /* Console (Preferences) */
     bool console_fixed;            /* fixed columns x rows instead of fitting the window */

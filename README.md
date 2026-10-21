@@ -26,6 +26,13 @@ macOS) as well.
   the window width. Stray control bytes show as visible glyphs, and a bare LF
   starts a new line on the main screen, as embedded devices expect. The
   scrollback keeps 200k lines and only draws the lines on screen.
+- **Batched screen redraws.** A status program that clears the screen and
+  rewrites it every few hundred milliseconds would otherwise wipe from top to
+  bottom as its bytes trickle in over several reads. When a clear screen or
+  cursor home arrives, the tab holds the incoming bytes until the stream goes
+  quiet (or 250 ms at most) and then shows the whole page in one frame.
+  Synchronized output (DEC mode 2026) is honoured the same way. Per tab, in
+  the tab menu; on by default.
 - **Two ways to type.** Click into the terminal and keystrokes go straight to
   the port (Ctrl+C, arrow keys, Tab completion and so on). Or use the line
   input at the bottom, which has history and a choice of line ending.

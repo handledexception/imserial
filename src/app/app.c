@@ -24,6 +24,7 @@ Tab *app_new_tab(App *a, const PortTarget *target)
     termbuf_init(&t->tb, (uint32_t)(a->scrollback_lines ? a->scrollback_lines : SCROLLBACK_DEFAULT));
     if (target)
         t->target = *target;
+    t->batch_redraws = true;
     /* New tabs inherit the active tab's settings so "+" feels like "duplicate". */
     Tab *cur = app_active_tab(a);
     if (cur) {
@@ -31,6 +32,7 @@ Tab *app_new_tab(App *a, const PortTarget *target)
         t->auto_reconnect = cur->auto_reconnect;
         t->timestamps = cur->timestamps;
         t->local_echo = cur->local_echo;
+        t->batch_redraws = cur->batch_redraws;
         t->nl_mode = cur->nl_mode;
         t->tx_eol = cur->tx_eol;
     }
@@ -271,12 +273,38 @@ void app_open_log_folder(App *a)
 #endif
 }
 
+/* Batched redraws: a full-screen program's page arrives over several reads
+ * (a USB serial adapter hands over a chunk every 16 ms or so, and a page is
+ * tens of milliseconds of line time). Showing each chunk as it lands wipes
+ * the screen top to bottom on every refresh. Once a clear screen or cursor
+ * home shows up in the pending bytes, the tab leaves them in the session
+ * until the stream has been quiet for a moment, so the whole page lands in
+ * one frame. The cap keeps a continuous stream from stalling the view. */
+#define REDRAW_QUIET_NS (60ull * 1000000)
+#define REDRAW_HOLD_MAX_NS (250ull * 1000000)
+
 /* Moves everything the I/O threads produced into the tabs' scrollback. */
 bool app_pump_sessions(App *a)
 {
     bool any = false;
+    uint64_t now = SDL_GetTicksNS();
+    a->rx_holding = false;
     for (int i = 0; i < a->ntabs; i++) {
         Tab *t = a->tabs[i];
+        if (t->batch_redraws) {
+            int sync = session_peek_sync(t->session);
+            if ((sync & SESSION_SYNC_BEGIN) && !t->hold_since_ns)
+                t->hold_since_ns = now;
+            if (t->hold_since_ns) {
+                bool quiet = now - session_last_rx_ns(t->session) >= REDRAW_QUIET_NS;
+                bool expired = now - t->hold_since_ns >= REDRAW_HOLD_MAX_NS;
+                if (!quiet && !expired && !(sync & SESSION_SYNC_END)) {
+                    a->rx_holding = true;
+                    continue;
+                }
+            }
+        }
+        t->hold_since_ns = 0;
         if (!session_drain(t->session, &t->drain))
             continue;
         any = true;

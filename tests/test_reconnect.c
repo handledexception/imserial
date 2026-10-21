@@ -77,6 +77,27 @@ int main(void)
     drain(s);
     CHECK(log_has("hello"));
 
+    /* Redraw peek: plain text sets nothing; a clear screen sets BEGIN; a
+     * sequence split across two reads is still found; a drain resets. */
+    CHECK(session_peek_sync(s) == 0);
+    CHECK(session_last_rx_ns(s) != 0);
+    fake_inject("plain text\r\n");
+    SDL_Delay(200);
+    CHECK(session_peek_sync(s) == 0);
+    fake_inject("\x1b[H\x1b[2Jpage one\r\n");
+    SDL_Delay(200);
+    CHECK(session_peek_sync(s) == SESSION_SYNC_BEGIN);
+    CHECK(session_peek_sync(s) == SESSION_SYNC_BEGIN); /* flags persist until drained */
+    fake_inject("\x1b[?20");
+    SDL_Delay(200);
+    CHECK(session_peek_sync(s) == SESSION_SYNC_BEGIN);
+    fake_inject("26l\r\n");
+    SDL_Delay(200);
+    CHECK(session_peek_sync(s) == (SESSION_SYNC_BEGIN | SESSION_SYNC_END));
+    drain(s);
+    CHECK(log_has("page one"));
+    CHECK(session_peek_sync(s) == 0);
+
     session_write(s, "ls\n", 3);
     SDL_Delay(200);
     CHECK(fake_tx_total() == 3);

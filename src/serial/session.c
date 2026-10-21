@@ -41,6 +41,9 @@ struct Session {
     uint64_t rx_bytes, tx_bytes;
     SessionBuf inbox;
     size_t last_rx_rec; /* offset of a trailing RX record we may extend, or SIZE_MAX */
+    uint64_t last_rx_ns;
+    size_t scan_off; /* session_peek_sync() progress through inbox */
+    int sync_flags;  /* SESSION_SYNC_* found since the last drain */
 };
 
 double wall_time_now(void)
@@ -121,8 +124,10 @@ static void push_data(Session *s, uint8_t type, const void *data, size_t len)
 {
     SDL_LockMutex(s->mtx);
     push_record_locked(s, type, data, len);
-    if (type == SREC_RX)
+    if (type == SREC_RX) {
         s->rx_bytes += len;
+        s->last_rx_ns = SDL_GetTicksNS();
+    }
     else if (type == SREC_TX)
         s->tx_bytes += len;
     SDL_UnlockMutex(s->mtx);
@@ -513,7 +518,66 @@ bool session_drain(Session *s, SessionBuf *out)
         s->inbox = *out;
         *out = t;
         s->last_rx_rec = SIZE_MAX;
+        s->scan_off = 0;
+        s->sync_flags = 0;
     }
     SDL_UnlockMutex(s->mtx);
     return any;
+}
+
+uint64_t session_last_rx_ns(Session *s)
+{
+    SDL_LockMutex(s->mtx);
+    uint64_t t = s->last_rx_ns;
+    SDL_UnlockMutex(s->mtx);
+    return t;
+}
+
+/* The sequences full-screen programs redraw with. Scanning the raw inbox
+ * (record headers included) is fine: a header can't spell out ESC [ ... */
+static const struct {
+    const char *seq;
+    int flag;
+} k_sync_seqs[] = {
+    {"\x1b[2J", SESSION_SYNC_BEGIN},     {"\x1b[H", SESSION_SYNC_BEGIN},      {"\x1b[1;1H", SESSION_SYNC_BEGIN},
+    {"\x1b[?1049h", SESSION_SYNC_BEGIN}, {"\x1b[?47h", SESSION_SYNC_BEGIN},   {"\x1b[?2026h", SESSION_SYNC_BEGIN},
+    {"\x1b[?2026l", SESSION_SYNC_END},
+};
+
+int session_peek_sync(Session *s)
+{
+    SDL_LockMutex(s->mtx);
+    const uint8_t *d = s->inbox.data;
+    /* Stop at the real end of the data: inbox.len includes the trailing
+     * record's padding, and a sequence cut off by a read must stay partial. */
+    size_t n = s->inbox.len, i = s->scan_off;
+    if (s->last_rx_rec != SIZE_MAX) {
+        const SessionRecord *r = (const SessionRecord *)(d + s->last_rx_rec);
+        n = s->last_rx_rec + sizeof *r + r->len;
+    }
+    while (i < n) {
+        if (d[i] != 0x1b) {
+            i++;
+            continue;
+        }
+        bool partial = false;
+        for (size_t k = 0; k < sizeof k_sync_seqs / sizeof k_sync_seqs[0]; k++) {
+            size_t len = strlen(k_sync_seqs[k].seq);
+            if (n - i < len) {
+                if (!memcmp(d + i, k_sync_seqs[k].seq, n - i))
+                    partial = true; /* could still complete with the next read */
+            } else if (!memcmp(d + i, k_sync_seqs[k].seq, len)) {
+                s->sync_flags |= k_sync_seqs[k].flag;
+                partial = false;
+                break;
+            }
+        }
+        if (partial)
+            break; /* rescan from this ESC once more bytes are in */
+        i++;
+    }
+    s->scan_off = i;
+    int flags = s->sync_flags;
+    SDL_UnlockMutex(s->mtx);
+    return flags;
 }

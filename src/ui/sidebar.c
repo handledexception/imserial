@@ -185,12 +185,13 @@ static bool baud_input(Tab *t)
     return changed;
 }
 
-static void switch_row(const char *label, bool *v, bool *changed)
+static void switch_row(const char *label, const char *tooltip, bool *v, bool *changed)
 {
     float w = igGetContentRegionAvail().x;
     ImVec2 p = igGetCursorScreenPos();
     float fs = g_app->font_size * g_app->ui_scale;
     float h = S(26);
+    igBeginGroup();
     ImVec2 ts = ui_text_size(g_app->font_ui, fs, label, NULL);
     ui_text(igGetWindowDrawList(), g_app->font_ui, fs, v2(p.x, p.y + (h - ts.y) * 0.5f), g_app->theme.fg, label, NULL);
     igSetCursorScreenPos(v2(p.x + w - S(32), p.y + (h - S(18)) * 0.5f));
@@ -198,6 +199,8 @@ static void switch_row(const char *label, bool *v, bool *changed)
         *changed = true;
     igSetCursorScreenPos(v2(p.x, p.y + h));
     igDummy(v2(1, 0));
+    igEndGroup();
+    ui_tooltip(tooltip);
 }
 
 void ui_sidebar(App *a, ImVec2 p0, ImVec2 p1)
@@ -249,41 +252,82 @@ void ui_sidebar(App *a, ImVec2 p0, ImVec2 p1)
         float lw = S(92);
         if (ui_section_header("CONNECTION", &a->sect_conn_open)) {
             igIndent(S(8));
+            /* Each row is a group so the tooltip shows over the label as
+             * well as the control. */
+            igBeginGroup();
             ui_form_label("Baud rate", lw);
             changed |= baud_input(t);
+            igEndGroup();
+            ui_tooltip("Bits per second on the wire. Must match the device.\n"
+                       "115200 is usual for modern boards, 9600 for older ones.");
 
             static const char *bits[] = {"5", "6", "7", "8"};
             int b = t->cfg.data_bits - 5;
+            igBeginGroup();
             ui_form_label("Data bits", lw);
             if (ui_segmented("##bits", bits, 4, &b, igGetContentRegionAvail().x)) {
                 t->cfg.data_bits = (uint8_t)(b + 5);
                 changed = true;
             }
+            igEndGroup();
+            ui_tooltip("Data bits per character. Almost everything uses 8.\n"
+                       "7 is seen on older equipment that also uses parity.");
+
             static const char *par[] = {"None", "Odd", "Even", "Mark", "Space"};
             int pv = (int)t->cfg.parity;
+            igBeginGroup();
             ui_form_label("Parity", lw);
             if (ui_combo("##parity", &pv, par, 5)) {
                 t->cfg.parity = (SerialParity)pv;
                 changed = true;
             }
+            igEndGroup();
+            ui_tooltip("Error-check bit added to each character.\n"
+                       "None for nearly all devices (the N in 8N1).\n"
+                       "Mark and Space always send a 1 or a 0 instead of a check.");
+
             static const char *stops[] = {"1", "2"};
             int sv = t->cfg.stop_bits == 2 ? 1 : 0;
+            igBeginGroup();
             ui_form_label("Stop bits", lw);
             if (ui_segmented("##stop", stops, 2, &sv, igGetContentRegionAvail().x)) {
                 t->cfg.stop_bits = (uint8_t)(sv + 1);
                 changed = true;
             }
+            igEndGroup();
+            ui_tooltip("Idle time after each character. 1 is standard.\n"
+                       "2 gives slow or old receivers extra time.");
+
             static const char *flow[] = {"None", "RTS/CTS", "XON/XOFF"};
             int fv = (int)t->cfg.flow;
+            igBeginGroup();
             ui_form_label("Flow control", lw);
             if (ui_combo("##flow", &fv, flow, 3)) {
                 t->cfg.flow = (SerialFlow)fv;
                 changed = true;
             }
+            igEndGroup();
+            ui_tooltip("How each side asks the other to pause.\n"
+                       "None: no pausing. Right for most boards.\n"
+                       "RTS/CTS: hardware lines. The device must drive CTS or sending stalls.\n"
+                       "XON/XOFF: control bytes in the data stream. Not safe for binary data.");
+
             igDummy(v2(1, S(2)));
-            switch_row("DTR", &t->cfg.dtr, &changed);
-            switch_row("RTS", &t->cfg.rts, &changed);
-            switch_row("Auto-reconnect", &t->auto_reconnect, &changed);
+            switch_row("DTR",
+                       "Data Terminal Ready output line.\n"
+                       "Many boards wire it to reset: an Arduino restarts when it toggles,\n"
+                       "and ESP32 flashers pulse it together with RTS.\n"
+                       "Turn it off to attach without resetting the board.",
+                       &t->cfg.dtr, &changed);
+            switch_row("RTS",
+                       "Request To Send output line, set by hand when flow control is not RTS/CTS.\n"
+                       "ESP32 and ESP8266 boards wire it to EN or GPIO0;\n"
+                       "the wrong state can hold the chip in reset or boot mode.",
+                       &t->cfg.rts, &changed);
+            switch_row("Auto-reconnect",
+                       "Follow this device by its USB identity and reopen it when it\n"
+                       "comes back, even if it appears under a different port name.",
+                       &t->auto_reconnect, &changed);
             igUnindent(S(8));
             igDummy(v2(1, S(4)));
         }
@@ -291,21 +335,37 @@ void ui_sidebar(App *a, ImVec2 p0, ImVec2 p1)
             igIndent(S(8));
             static const char *eol[] = {"None", "LF", "CR", "CRLF"};
             int ev = (int)t->tx_eol;
+            igBeginGroup();
             ui_form_label("Send ending", lw);
             if (ui_segmented("##eol", eol, 4, &ev, igGetContentRegionAvail().x)) {
                 t->tx_eol = (TxEol)ev;
                 changed = true;
             }
+            igEndGroup();
+            ui_tooltip("Line ending added when you press Enter in the send bar.\n"
+                       "CR is what most shells and bootloaders expect. LF for Unix-style devices.\n"
+                       "None sends the text as is. Keys typed directly into the terminal are not affected.");
             igDummy(v2(1, S(2)));
             bool cr_nl = t->nl_mode == TB_NL_ANY;
             bool nl_changed = false;
-            switch_row("Timestamps", &t->timestamps, &changed);
-            switch_row("Local echo", &t->local_echo, &changed);
-            switch_row("Treat CR as new line", &cr_nl, &nl_changed);
+            switch_row("Timestamps",
+                       "Show the time each line arrived, in a gutter on the left,\n"
+                       "with millisecond precision. Hidden on the alternate screen.", &t->timestamps, &changed);
+            switch_row("Local echo",
+                       "Show what you send in the terminal as well. Turn it on when\n"
+                       "the device does not echo your typing back and you cannot see it.", &t->local_echo, &changed);
+            switch_row("Treat CR as new line",
+                       "Off: LF starts a new line and a bare CR returns to the start of the\n"
+                       "line so progress bars redraw in place, like a real terminal.\n"
+                       "On: CR, LF and CRLF each end a line, for devices that only send CR.", &cr_nl, &nl_changed);
             if (nl_changed) {
                 t->nl_mode = cr_nl ? TB_NL_ANY : TB_NL_TERMINAL;
                 changed = true;
             }
+            switch_row("Batch screen redraws",
+                       "When a program clears the screen and redraws it, wait for the whole\n"
+                       "page to arrive and show it in one frame instead of line by line.",
+                       &t->batch_redraws, &changed);
             igUnindent(S(8));
         }
         if (changed)

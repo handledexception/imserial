@@ -138,6 +138,7 @@ void settings_load(App *a)
         t->auto_reconnect = boolean(jt, "autoReconnect", true);
         t->timestamps = boolean(jt, "timestamps", false);
         t->local_echo = boolean(jt, "localEcho", false);
+        t->batch_redraws = boolean(jt, "batchRedraws", true);
         t->nl_mode = (TermNewlineMode)num(jt, "newlineMode", 0);
         t->tb.nl_mode = t->nl_mode;
         t->tx_eol = (TxEol)num(jt, "txEol", EOL_LF);
@@ -219,6 +220,7 @@ void settings_save(App *a)
         cJSON_AddBoolToObject(jt, "autoReconnect", t->auto_reconnect);
         cJSON_AddBoolToObject(jt, "timestamps", t->timestamps);
         cJSON_AddBoolToObject(jt, "localEcho", t->local_echo);
+        cJSON_AddBoolToObject(jt, "batchRedraws", t->batch_redraws);
         cJSON_AddNumberToObject(jt, "newlineMode", t->nl_mode);
         cJSON_AddNumberToObject(jt, "txEol", t->tx_eol);
         cJSON_AddBoolToObject(jt, "connected", t->want_connected);

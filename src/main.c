@@ -553,6 +553,8 @@ int main(int argc, char **argv)
             tooltip_tick = igIsAnyItemHovered() || igIsAnyItemActive();
             timeout = tooltip_tick ? 100 : 1000;
         }
+        if (a->rx_holding && timeout > 8)
+            timeout = 8; /* a held redraw is released on a quiet gap, not an event */
         bool got = SDL_WaitEventTimeout(&e, timeout);
         if (got) {
             do
